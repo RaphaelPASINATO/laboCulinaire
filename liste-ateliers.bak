@@ -1,0 +1,211 @@
+<?php
+include_once("includes/inc-fonctions.php");
+include_once("bdd/connectBDD.php");
+include_once("bdd/getLesAteliers.php");
+include_once("bdd/getSessionsParAtelier.php");
+include_once("bdd/getLesCategories.php");
+if (count($_POST) == 0) {
+    $lesAteliers = getLesAteliers();
+} else {
+    /* Clic du bouton « appliquer-filtres » : récupérer la liste des ateliers
+ correspondant aux critères */
+    if (isset($_POST['appliquer-filtres'])) {
+        // A COMPLETER
+        include_once("bdd/getLesAteliersAvecCriteres.php");
+        $filtrePrix = filter_input(INPUT_POST, 'filtrePrix', FILTER_VALIDATE_INT);
+        $idCategorie = filter_input(INPUT_POST, 'idCategorie', FILTER_VALIDATE_INT);
+
+        $erreurs = array();
+        $options = ["options" => ["regexp" => "#^\d{4}-\d{2}-\d{2}$#"]];
+
+        $filtreDateDebut = filter_input(INPUT_POST, 'filtreDateDebut', FILTER_VALIDATE_REGEXP, $options);
+            /* Extrait les parties année, mois et jour pour vérifier que la date existe bien
+         A l’aide de la fonction checkdate */
+            @list($aa, $mm, $dd) = explode('-', $filtreDateDebut);
+            if (!empty($filtreDateDebut) && !checkdate($mm, $dd, $aa)) {
+                $erreurs['filtreDateDebut'] = "date erronée : $filtreDateDebut";
+            }
+            //echo $filtreDateDebut . "<br>" . date("Y-m-d");
+            if (!empty($filtreDateDebut) && $filtreDateDebut < date("Y-m-d")) {
+                $erreurs['filtreDateDebut'] = "La date ne peut pas être dans le passé";
+            }
+
+
+        $filtreDateFin = filter_input(INPUT_POST, 'filtreDateFin', FILTER_VALIDATE_REGEXP, $options);
+        /* Extrait les parties année, mois et jour pour vérifier que la date existe bien
+         A l’aide de la fonction checkdate */
+        @list($aa, $mm, $dd) = explode('-', $filtreDateFin);
+        if (!empty($filtreDateFin) && !checkdate($mm, $dd, $aa)) {
+            $erreurs['filtreDateFin'] = "date erronée : $filtreDateFin";
+        }
+        if (!empty($filtreDateFin) && $filtreDateFin < date("Y-m-d")) {
+            $erreurs['filtreDateFin'] = "La date ne peut pas être dans le passé";
+        }
+        $lesAteliers = getLesAteliersAvecCriteres(
+            $idCategorie,
+            $filtrePrix,
+            $filtreDateDebut,
+            $filtreDateFin
+        );
+    }
+    /* Clic du bouton « effacer-filtres » : effacer tous les critères et récupérer
+ La liste de tous les ateliers */
+    if (isset($_POST['effacer-filtres'])) {
+        unset($idCategorie, $filtrePrix, $filtreDateDebut, $filtreDateFin);
+        $lesAteliers = getLesAteliers();
+        $erreurs = [];
+    }
+}
+$lesCategories = getLesCategories();
+?>
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Le labo culinaire</title>
+    <link rel="shortcut icon" href="images/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,300i,400,400i,900" rel="stylesheet">
+    <link rel="stylesheet" media="screen" href="vendor/bootstrap-4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="vendor/fontawesome-5.10.2-free/css/all.min.css">
+    <link rel="stylesheet" media="screen" href="css/styles.min.css">
+
+    <style>
+        #header-bottom {
+            background: url(images/bg-small-2.jpg) no-repeat;
+            background-size: cover;
+        }
+    </style>
+</head>
+
+<body>
+    <header id="header-small">
+        <?php include_once("includes/inc-header.html"); ?>
+    </header>
+
+    <section id="atelier" class="fond-clair py-5 px-1 px-lg-3 px-xl-5">
+        <h1 class="text-center">Les ateliers du moment </h1>
+        <?php
+        if (count($_POST) > 0) {
+            if (count($erreurs) != 0) {
+                echo getListeErreurs($erreurs);
+            } else {
+                if (empty($info) == false) {
+                    echo $info;
+                }
+            }
+        }
+        ?>
+
+        <div id="filtre-cours">
+            <div class="mb-4 text-center">
+                <a class="btn btn-dark" data-toggle="collapse" href="#criteres" role="button" aria-expanded="false" aria-controls="criteres">Filtrer</a>
+            </div>
+            <div id="criteres" class="collapse">
+                <form action="" method="post">
+                    <div class="row">
+                        <div class="col">
+                            <label for="filtre-categorie">Catégorie</label>
+                            <select class="form-control" id="filtre-categorie" name="idCategorie">
+                                <option value=''>--- Choisir ----</option>
+                                <?php
+                                foreach ($lesCategories as $categorie) {
+                                    if (isset($idCategorie) && $idCategorie == $categorie->id) {
+                                        echo "<option value='$categorie->id' selected >" . htmlspecialchars($categorie->libelle) . "</option>";
+                                    } else {
+                                        echo "<option value='$categorie->id'>" . htmlspecialchars($categorie->libelle) . "</option>";
+                                    }
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        <div class="col">
+                            <label for="filtre-date-fin">Prix max</label>
+                            <input type="input" class="form-control" id="filtre-prix" name="filtrePrix" value="<?php if (isset($filtrePrix)) {
+                                                                                                                    echo $filtrePrix;
+                                                                                                                } ?>">
+                        </div>
+                        <div class="col">
+                            <label for="filtre-date-debut">Date début</label>
+                            <input type="date" class="form-control" id="filtre-date-debut" name="filtreDateDebut" value="<?php if (isset($filtreDateDebut)) {
+                                                                                                                                echo $filtreDateDebut;
+                                                                                                                            } ?>">
+                        </div>
+                        <div class="col">
+                            <label for="filtre-date-fin">Date fin</label>
+                            <input type="date" class="form-control" id="filtre-date-fin" name="filtreDateFin" value="<?php if (isset($filtreDateFin)) {
+                                                                                                                            echo $filtreDateFin;
+                                                                                                                        } ?>">
+                        </div>
+                        <div class="col d-flex align-items-end">
+                            <div>
+                                <button type="submit" class="btn btn-danger d-inline" id="appliquer-filtres" name="appliquer-filtres">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button type="submit" class="btn btn-outline-dark d-inline" id="effacer-filtres" name="effacer-filtres">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="liste-ateliers" class="d-flex flex-wrap justify-content-center">
+            <?php
+            foreach ($lesAteliers as $atelier) {
+                // génère le nom du fichier image : img-atelier- suivi de l’id de l’atelier
+                $rep = str_replace("\\", "/", dirname(__FILE__, 1));
+                $img = "images/ateliers/img-atelier-" . $atelier->id . ".jpg";
+                if (!file_exists($rep . "/" . $img)) {
+                    $img = "images/atelier/img-atelier-default.jpg";
+                }
+            ?>
+                <article>
+                    <div class="wrapper-cours"><img src="<?php echo $img; ?>" alt=""></div> <!-- image -->
+                    <div class="detail-cours">
+                        <h2 class="titre-cours"><?php echo htmlspecialchars($atelier->intitule); ?></h2> <!-- intitulé -->
+                        <div class="d-table">
+                            <div class="d-table-row">
+                                <div class="d-table-cell"><i class="far fa-clock"></i></div>
+                                <div class="d-table-cell"> <?php echo $atelier->duree; ?> heures </div> <!-- durée -->
+                            </div>
+                            <div class="d-table-row">
+                                <div class="d-table-cell"><i class="fas fa-euro-sign"></i></div>
+                                <div class="d-table-cell"> <?php echo $atelier->prixParPersonne; ?> € par pers.</div> <!-- prix -->
+                            </div>
+                            <?php
+                            // Récupère les 4 premières sessions de l’atelier
+                            $lesSessions = getSessionsParAtelier($atelier->id, 4);
+                            foreach ($lesSessions as $session) {
+                            ?>
+                                <div class="d-table-row session">
+                                    <div class="d-table-cell"><i class="far fa-calendar-alt"></i></div>
+                                    <div class="d-table-cell"> <?php echo dateAnglaisVersFrancaisFormatLong($session->dateSession) . ' ' . timeVersHeure($session->heureDebut); ?> </div>
+                                </div>
+                            <?php
+                            } // fin du foreach parcourant les sessions de l’atelier
+                            ?>
+                        </div> <!-- fin div d-table -->
+                        <a class="btn-infos" href="detail-atelier.php?id=<?php echo $atelier->id; ?>">Plus d'infos</a>
+                    </div> <!-- fin div detail-cours -->
+                </article>
+                <?php
+            } // fin du foreach parcourant les ateliers
+                ?>>
+        </div>
+    </section>
+    <?php include_once("includes/inc-footer.html"); ?>
+
+    <!-- jQuery -->
+    <script src="vendor/jquery-3.4.1/jquery-3.4.1.min.js"></script>
+    <script src="vendor/bootstrap-4.3.1/js/bootstrap.min.js"></script>
+    <script src="js/ateliers.min.js"></script>
+
+</body>
+
+</html>
